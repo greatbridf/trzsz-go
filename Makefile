@@ -1,5 +1,11 @@
 BIN_DIR := ./bin
 BIN_DST := /usr/bin
+VERSION := 1.2.0
+RELEASE := 1
+TARNAME := trzsz-$(VERSION)-$(RELEASE)
+TAREXT  := tar.gz
+TARBALL := $(TARNAME).$(TAREXT)
+excludes := bin/* dist/* .git/* .github/* .*.swp
 
 ifdef GOOS
 	ifeq (${GOOS}, windows)
@@ -29,7 +35,7 @@ else
 	GO_TEST := ${shell basename `which gotest 2>/dev/null` 2>/dev/null || echo go test}
 endif
 
-.PHONY: all clean test install
+.PHONY: all clean test install tarball dist
 
 all: ${BIN_DIR}/${TRZ} ${BIN_DIR}/${TSZ} ${BIN_DIR}/${TRZSZ}
 
@@ -57,3 +63,26 @@ else
 	cp ${BIN_DIR}/tsz ${DESTDIR}${BIN_DST}/
 	cp ${BIN_DIR}/trzsz ${DESTDIR}${BIN_DST}/
 endif
+
+dist/$(TARBALL):
+	mkdir -p dist
+	git archive HEAD --format=$(TAREXT) --prefix=$(TARNAME)/ --output $@
+
+define DO_RPMBUILD
+@echo "=== RPMBULID ==="
+rpmbuild \
+	--define '_topdir $(CURDIR)/dist' \
+	--define '_builddir $(CURDIR)/dist/build' \
+	--define '_rpmdir $(CURDIR)/dist/rpm' \
+	--define '_sourcedir $(CURDIR)/dist' \
+	--define '_specdir $(CURDIR)/dist' \
+	--define '_srcrpmdir $(CURDIR)/dist' \
+	--define '_buildrootdir $(CURDIR)/dist/buildroot' \
+	--define 'debug_package %{nil}' \
+	--define 'tarname $(TARNAME)' \
+	--define 'tarball $(TARBALL)' \
+	$(1)
+endef
+
+dist: dist/$(TARBALL)
+	$(call DO_RPMBUILD,-bb --nodeps build.spec)
